@@ -1,20 +1,21 @@
 const predictClassification = require("../services/inferenceService");
-const storeData = require("../services/storeData");
+const { storeData, getData } = require("../services/storeData");
 const crypto = require("crypto");
 
 async function postPredictHandler(request, h) {
   const { image } = request.payload;
   const { model } = request.server.app;
 
-  const { confidenceScore, label, explanation, suggestion } =
-    await predictClassification(model, image);
+  const { confidenceScore, result, suggestion } = await predictClassification(
+    model,
+    image
+  );
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
 
   const data = {
     id: id,
-    result: label,
-    explanation: explanation,
+    result: result,
     suggestion: suggestion,
     confidenceScore: confidenceScore,
     createdAt: createdAt,
@@ -24,13 +25,31 @@ async function postPredictHandler(request, h) {
 
   const response = h.response({
     status: "success",
-    message:
-      confidenceScore > 99
-        ? "Model is predicted successfully."
-        : "Model is predicted successfully but under threshold. Please use the correct picture",
+    message: "Model is predicted successfully",
     data,
   });
   response.code(201);
   return response;
 }
-module.exports = postPredictHandler;
+
+async function getHistoriesHandler(request, h) {
+  const histories = await getData();
+  const result = [];
+  histories.forEach((doc) => {
+    result.push({
+      id: doc.id,
+      history: {
+        result: doc.data().result,
+        createdAt: doc.data().createdAt,
+        suggestion: doc.data().suggestion,
+        id: doc.data().id,
+      },
+    });
+  });
+  return h.response({
+    status: "success",
+    data: result,
+  });
+}
+
+module.exports = { postPredictHandler, getHistoriesHandler };
